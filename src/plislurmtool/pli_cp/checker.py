@@ -11,10 +11,10 @@ def date2int(date_str):
 
 
 class ResourceChecker:
-    def __init__(self, user, partition, quota, rolling_window=30 * 34 * 60):
+    def __init__(self, user, qos, quota, rolling_window=30 * 34 * 60):
         self.user = user
         self.rolling_window = rolling_window
-        self.partition = partition
+        self.qos = qos
         self.quota = quota
 
         # If rolling reset days is set, start time is set to that many days ago
@@ -29,11 +29,9 @@ class ResourceChecker:
 
     def fetch_report(self) -> list:
         if self.user == "ALL":
-            command = f"sacct --allusers -S {self.start_time} -E {self.end_time} --partition={self.partition} --json"
+            command = f"sacct --allusers -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         else:
-            command = (
-                f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --partition={self.partition} --json"
-            )
+            command = f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         try:
             output = json.loads(subprocess.check_output(command, shell=True))
         except subprocess.CalledProcessError:
@@ -60,7 +58,7 @@ class ResourceChecker:
                 "job_id": job["job_id"],
                 "limit": job["time"]["limit"]["number"],
             }
-            for key in ["qos", "account", "partition", "qos", "user", "allocation_nodes", "state"]:
+            for key in ["qos", "account", "qos", "qos", "user", "allocation_nodes", "state"]:
                 record[key] = job[key]
 
             if record["start_time"] >= start_time_int:
@@ -132,9 +130,9 @@ class ResourceChecker:
         percentage_used = gpu_hours / self.quota
         pbar = progress_bar(percentage_used)
         report_strs = [
-            "== PLI High Priority GPU Usage Report ==\n",
+            "\n== PLI High Priority GPU Usage Report ==\n",
             f"User: {self.user}",
-            f"Partition: {self.partition}",
+            f"qos: {self.qos}",
             f"Cycle Start:\t\t{self.start_time}",
             f"Cycle End:\t\t{self.end_time}",
             f"HP GPU hrs used:\t{gpu_hours:.2f} hours.",
@@ -144,7 +142,7 @@ class ResourceChecker:
 
         if percentage_used > 1:
             report_strs.append(
-                f"\nWARNING: YOU HAVE EXCEEDED YOUR HP GPU QUOTA!\nJobs submitted to {self.partition} will be automatically CANCELLED."
+                f"\nWARNING: YOU HAVE EXCEEDED YOUR HP GPU QUOTA!\nJobs submitted to {self.qos} will be automatically CANCELLED."
             )
         if self.rolling_window:
             report_strs.append(
@@ -158,20 +156,25 @@ class ResourceChecker:
 
 
 class ResourceCheckerAdmin(ResourceChecker):
-    def __init__(self, partition, quota, monitor_window=30, user_rolling_window=30 * 24 * 60):
+    def __init__(self, qos, quota, monitor_window=30, user_rolling_window=30 * 24 * 60):
         """
-        Check the active jobs for all users in the partition recently (default 30 mins)
+        Check the active jobs for all users in the qos recently (default 30 mins)
         """
-        super().__init__("ALL", partition, quota, monitor_window)
+        super().__init__("ALL", qos, quota, monitor_window)
         self.user_rolling_window = user_rolling_window
+        # self.report_usage()
 
     def usage_monitor(self):
         active_users = set()
         for job in self.active_jobs:
             active_users.add(job["user"])
 
+        if len(active_users) == 0:
+            print("No active jobs found")
+            return
+
         for user in list(active_users):
-            user_checker = ResourceChecker(user, self.partition, self.quota, self.user_rolling_window)
+            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
             user_quota, _ = user_checker.usage_report(verbose=False)
             print(f"User: {user} | Remaining Quota: {user_quota:.2f} GPUhrs")
 
@@ -190,17 +193,47 @@ class ResourceCheckerAdmin(ResourceChecker):
                     for job in user_checker.active_jobs:
                         cancel_job(job["job_id"])
 
+    def fetch_all_users(self):
+        command = "sacctmgr list account pli withassoc format=User --json"
+        account_meta = json.loads(subprocess.check_output(command, shell=True))
+        all_users = []
+        for meta in account_meta["accounts"][0]["associations"]:
+            if len(meta["user"]) > 0:
+                all_users.append(meta["user"])
+
+        return all_users
+
+    def report_usage_stats(self):
+        users = self.fetch_all_users()
+        usage_ls = []
+
+        for user in list(users):
+            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
+            user_quota, _ = user_checker.usage_report(verbose=False)
+
+            used_quota = self.quota - user_quota
+            if used_quota > 1e-5:
+                usage_ls.append((user, used_quota))
+
+        usage_ls.sort(key=lambda x: x[1], reverse=True)
+        # print("== PLI High Priority GPU Usage Report ==\n")
+        print(f"\n {'User':10} | Quota Used (cap@{self.quota:.2f})")
+        print("======================================")
+        for user, quota in usage_ls:
+            message = "!Exceeded!" if quota < 0 else ""
+            print(f" {user:10} | {quota:.3f} GPUhrs\t{message}")
+
 
 if __name__ == "__main__":
     user_name = os.environ["USER"]
     user_name = "ALL"
-    partition = "pli-c"
+    qos = "pli-cp"
     start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d-%H:%M:%S")
     end_date = datetime.now().strftime("%Y-%m-%d-%H:%M:%S")
 
     quota = 500
-    # checker = ResourceChecker(user_name, partition, quota, rolling_window=30*24*60)
+    # checker = ResourceChecker(user_name, qos, quota, rolling_window=30*24*60)
     # checker.usage_report(quota)
 
-    admin_checker = ResourceCheckerAdmin(partition, quota, monitor_window=30, user_rolling_window=30 * 24 * 60)
+    admin_checker = ResourceCheckerAdmin(qos, quota, monitor_window=30, user_rolling_window=30 * 24 * 60)
     admin_checker.usage_monitor()

@@ -4,7 +4,7 @@ def progress_bar(percent, length=50):
     """
     pbar = "█" * min(length, int(percent // (1 / length)))
     pbar += "░" * (length - len(pbar))
-    pbar += f"  {100 * percent:.2f}%"
+    pbar += f"  {100 * percent:.3f}%"
     return pbar
 
 
