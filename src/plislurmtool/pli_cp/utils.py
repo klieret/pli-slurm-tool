@@ -8,7 +8,7 @@ def progress_bar(percent, length=50):
     return pbar
 
 
-def email_hpgres_cap_warning(user, message, active_jobs):
+def email_hpgres_cap_warning(user, message, active_jobs, yag):
     header = f"[Della-PLI-CP] {user} High Priority GPU Quota Exceeded"
 
     body = f"Dear user {user},\n\nOur monitoring system detected that you have exceeded the designated quota for high priority GPU (pli-pc). Please cancel jobs launched on pli-cp and use the general partition pli-c instead.\nWe have a 1-day grace period for the quota. Jobs launched tomorrow will be scanceled directly.\n\nThank you for your cooperation.\n\n{message}\n"
@@ -17,10 +17,13 @@ def email_hpgres_cap_warning(user, message, active_jobs):
         body += f"Job ID: {job['job_id']}: \t {job['job_name']}\n"
     print(header)
 
-    # TODO: Email the user
+    try:
+        yag.send(f"{user}@princeton.edu", header, body)
+    except Exception as e:
+        print(f"Error while sending email to {user}@princeton.edu: {str(e)}")
 
 
-def email_hpgres_cap_canceling(user, message, active_jobs):
+def email_hpgres_cap_canceling(user, message, active_jobs, yag):
     header = f"[Della-PLI-CP] {user} High Priority GPU Quota Exceeded, Jobs Canceled!"
 
     body = f"Dear user {user},\n\nOur monitoring system detected that you have exceeded the designated quota for high priority GPU (pli-pc). We have canceled the following jobs. Please use the pli-c partition instead. Thanks for your cooperation\n\n{message}\n"
@@ -31,7 +34,10 @@ def email_hpgres_cap_canceling(user, message, active_jobs):
         body += f"Job ID: {job['job_id']}: \t {job['job_name']}\n"
     print(header)
 
-    # TODO: Email the user
+    try:
+        yag.send(f"{user}@princeton.edu", header, body)
+    except Exception as e:
+        print(f"Error while sending email to {user}@princeton.edu: {str(e)}")
 
 
 def cancel_job(job_id):
