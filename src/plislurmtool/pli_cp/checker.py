@@ -4,12 +4,8 @@ import subprocess
 from datetime import datetime, timedelta
 
 import yagmail
-from dotenv import load_dotenv
 
 from .utils import cancel_job, email_hpgres_cap_canceling, email_hpgres_cap_warning, progress_bar
-
-load_dotenv("local.env")
-
 
 def date2int(date_str):
     return datetime.strptime(date_str, "%Y-%m-%d-%H:%M:%S").timestamp()

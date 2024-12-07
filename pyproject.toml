@@ -27,8 +27,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "yagmail", 
-    "python-dotenv"
+    "yagmail"
 ]
 
 [project.optional-dependencies]
