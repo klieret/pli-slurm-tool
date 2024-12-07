@@ -17,7 +17,10 @@ class ResourceChecker:
         self.rolling_window = rolling_window
         self.qos = qos
         self.quota = quota
-        self.yag = yagmail.SMTP(os.getenv("EmailUsername"), os.getenv("Password"))
+        try:
+            self.yag = yagmail.SMTP(os.getenv("EmailUsername"), os.getenv("Password"))
+        except Exception as e:
+            pass
 
         # If rolling reset days is set, start time is set to that many days ago
         # Otherwise, start time is set to the first day of the current month
