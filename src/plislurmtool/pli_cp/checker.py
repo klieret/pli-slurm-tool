@@ -3,6 +3,8 @@ import os
 import subprocess
 from datetime import datetime, timedelta
 
+import yagmail
+
 from .utils import cancel_job, email_hpgres_cap_canceling, email_hpgres_cap_warning, progress_bar
 
 
@@ -16,6 +18,7 @@ class ResourceChecker:
         self.rolling_window = rolling_window
         self.qos = qos
         self.quota = quota
+        self.yag = yagmail.SMTP(os.getenv("EmailUsername"), os.getenv("Password"))
 
         # If rolling reset days is set, start time is set to that many days ago
         # Otherwise, start time is set to the first day of the current month
@@ -183,13 +186,13 @@ class ResourceCheckerAdmin(ResourceChecker):
                 if user_checker.get_quota_yesterday() >= 0:
                     # send warning email
                     _, user_report = user_checker.usage_report()
-                    email_hpgres_cap_warning(user, user_report, user_checker.active_jobs)
+                    email_hpgres_cap_warning(user, user_report, user_checker.active_jobs, self.yag)
 
                 # If the user has exceeded the quota and the grace period (1 day) is over
                 else:
                     # send canceling email and cancel jobs
                     _, user_report = user_checker.usage_report()
-                    email_hpgres_cap_canceling(user, user_report, user_checker.active_jobs)
+                    email_hpgres_cap_canceling(user, user_report, user_checker.active_jobs, self.yag)
                     for job in user_checker.active_jobs:
                         cancel_job(job["job_id"])
 

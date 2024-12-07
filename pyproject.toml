@@ -27,6 +27,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "yagmail"
 ]
 
 [project.optional-dependencies]
@@ -47,12 +48,6 @@ version = {attr = "plislurmtool.__version__"}
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = false
-
-# [project.urls]
-# "Homepage" = "https://swe-agent.com"
-# "Bug Reports" = "http://github.com/princeton-nlp/SWE-agent/issues"
-# "Documentation" = "https://princeton-nlp.github.io/SWE-agent/"
-# "Source" = "http://github.com/princeton-nlp/SWE-agent"
 
 [project.scripts]
 pli-slurm-tool = "plislurmtool.main:main"
