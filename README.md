@@ -26,3 +26,14 @@ pip install pre-commit
 pre-commit install
 pip install --editable .
 ```
+
+In order to release a new version
+
+1. Bump version (you cannot overwrite pypi versions)
+2. Add tag `git tag v1.0.0`
+3. Push `git push && git push origin v1.0.0`
+4. `rm -r dist/** && python -m build`
+5. `pipx run twine check dist/**`
+6. `pipx run twine upload dist/**`
+
+Ask Kilian for API key
