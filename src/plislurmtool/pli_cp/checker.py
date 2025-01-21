@@ -152,7 +152,7 @@ class ResourceChecker:
             )
         if self.rolling_window:
             report_strs.append(
-                f"\nQuota of high priority GPU hrs is calculateds over a rolling window of {self.rolling_window // (24*60)} days."
+                f"\nQuota of high priority GPU hrs is calculateds over a rolling window of {self.rolling_window // (24 * 60)} days."
             )
             report_strs.append(self.get_quota_forecast(self.quota))
         else:
