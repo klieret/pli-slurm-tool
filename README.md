@@ -2,26 +2,30 @@
 
 Script to monitor PLI partitions of the Princeton clusters
 
-## Install
+## Usage
 
 Install the pipx package in your environment: e.g. `pip install pipx`.
 
-## How to Use
+```bash
+# User-level quota checking for PLI-CP QoS
+pipx run pli-slurm-tool cp-quota-check`
+```
 
-* User-level quota checking for PLI-CP QoS: `pipx run pli-slurm-tool cp-quota-check`
+## Admin usage
+
 * Admin-level quota management for PLI-CP QoS `pipx run pli-slurm-tool cp-monitor-admin` (to be executed every ~30 mins)
 * Admin-level usage stats for PLI-CP QoS `pipx run pli-slurm-tool cp-quota-report-admin`
 
-## Admin usage
 Please add gmail username and app password to your system environment variables to enable email notifications to users:
-```
+
+```bash
 export EmailUsername=XXX
 export Password=XXX
 ```
 
 ## Development setup
 
-```
+```bash
 pip install pre-commit
 pre-commit install
 pip install --editable .
