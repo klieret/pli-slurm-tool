@@ -1,5 +1,7 @@
 import argparse
 import os
+import json
+import threading
 
 from .pli_cp import ResourceChecker, ResourceCheckerAdmin
 
@@ -34,6 +36,38 @@ def pli_pc_monitor_admin(quota: int, monitor_window: int, rolling_window: int):
     )
     rc.usage_monitor()
 
+
+def pli_lc_monitor_admin(monitor_window: int, file_path:str):
+    """
+    Monitors the resource usage quota for a specific account on pli-lc partition.
+    The quota is defined over a specific timeline. 
+    Intended for admin use only. Should be run periodically to check the current job queue.
+    """
+    def _read_data():
+        with threading.Lock():
+            try:
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                print("Data read successfully from JSON file.")
+                return data
+            except (IOError, json.JSONDecodeError) as e:
+                print(f"Failed to read JSON file: {e}")
+                raise
+    
+    if not os.path.exists(file_path):
+        raise f"JSON file found at {file_path}."
+    
+    mapping_account2quota = _read_data()
+
+    for account in mapping_account2quota["accounts"]:
+        rc = ResourceCheckerAdmin(
+            qos=account["qos"],
+            quota=account["quota"],
+            monitor_window=monitor_window,
+            start_date = account["start_date"],
+            account = account["account"]
+        )
+        rc.usage_monitor()
 
 def pli_pc_monitor_admin_report(quota: int, monitor_window: int, rolling_window: int):
     """
@@ -70,11 +104,18 @@ def main():
         default=30 * 24 * 60,  # 30 days
         help="(User) rolling window in minutes",
     )
+    parent_parser.add_argument(
+        "--path_to_mapping",
+        type=str,
+        default=30 * 24 * 60,  # 30 days
+        help="Path to JSON file that contains mapping of quota/users in PLI-LC",
+    )    
 
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("cp-quota-check", help="Check quota for PLI-CP QOS", parents=[parent_parser])
     subparsers.add_parser("cp-monitor-admin", help="Admin monitoring for PLI-CP QOS", parents=[parent_parser])
     subparsers.add_parser("cp-quota-report-admin", help="Admin quota for PLI-CP QOS", parents=[parent_parser])
+    subparsers.add_parser("lc-monitor-admin", help="Admin quota for PLI-LC QOS", parents=[parent_parser])
 
     args = parser.parse_args()
 
@@ -84,6 +125,8 @@ def main():
         pli_pc_monitor_admin(args.quota, args.monitor_window, args.rolling_window)
     elif args.command == "cp-quota-report-admin":
         pli_pc_monitor_admin_report(args.quota, args.monitor_window, args.rolling_window)
+    elif args.command == "lc-monitor-admin":
+        pli_lc_monitor_admin(args.monitor_window, args.path_to_mapping)
     else:
         print("No command provided. Use -h for help.")
 

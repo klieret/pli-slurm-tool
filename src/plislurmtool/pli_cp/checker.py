@@ -11,21 +11,29 @@ from .utils import cancel_job, email_hpgres_cap_canceling, email_hpgres_cap_warn
 def date2int(date_str):
     return datetime.strptime(date_str, "%Y-%m-%d-%H:%M:%S").timestamp()
 
-
 class ResourceChecker:
-    def __init__(self, user, qos, quota, rolling_window=30 * 34 * 60):
+    def __init__(self, user, qos, quota, rolling_window=30 * 34 * 60, start_date=None, account = None):
         self.user = user
         self.rolling_window = rolling_window
         self.qos = qos
         self.quota = quota
+        self.start_date = start_date
+        self.account = account
         try:
             self.yag = yagmail.SMTP(os.getenv("EmailUsername"), os.getenv("Password"))
         except Exception:
             pass
 
-        # If rolling reset days is set, start time is set to that many days ago
+        # If start date is set, start_time is this specific start date (for the pli-lc use case)
+        # Else if rolling reset days is set, start time is set to that many days ago
         # Otherwise, start time is set to the first day of the current month
-        if self.rolling_window:
+        if self.start_date:
+            try:
+                start_datetime = datetime.strptime(start_date, "%Y-%m-%d-%H:%M:%S")
+                self.start_time = start_datetime.strftime("%Y-%m-%d-%H:%M:%S")
+            except ValueError as ve:
+                raise ValueError("start_date must be in 'YYYY-MM-DD-HH:MM:SS' format") from ve
+        elif self.rolling_window:
             self.start_time = (datetime.now() - timedelta(minutes=rolling_window)).strftime("%Y-%m-%d-%H:%M:%S")
         else:
             self.start_time = datetime.now().replace(day=1).strftime("%Y-%m-%d-00:00:00")
@@ -37,7 +45,10 @@ class ResourceChecker:
         if self.user == "ALL":
             command = f"sacct --allusers -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         else:
-            command = f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
+            if self.account:
+                command = f"sacct -A {self.account} -S {self.start_time} -E {self.end_time} --qos={qos} --json"
+            else:
+                command = f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         try:
             output = json.loads(subprocess.check_output(command, shell=True))
         except subprocess.CalledProcessError:
@@ -137,7 +148,7 @@ class ResourceChecker:
         pbar = progress_bar(percentage_used)
         report_strs = [
             "\n== PLI High Priority GPU Usage Report ==\n",
-            f"User: {self.user}",
+            f"User: {self.user}" if self.user else f"Account: {self.account}",
             f"qos: {self.qos}",
             f"Cycle Start:\t\t{self.start_time}",
             f"Cycle End:\t\t{self.end_time}",
@@ -162,12 +173,15 @@ class ResourceChecker:
 
 
 class ResourceCheckerAdmin(ResourceChecker):
-    def __init__(self, qos, quota, monitor_window=30, user_rolling_window=30 * 24 * 60):
+    def __init__(self, qos, quota, monitor_window=30, user_rolling_window=30 * 24 * 60, start_date = None, account = None):
         """
         Check the active jobs for all users in the qos recently (default 30 mins)
         """
-        super().__init__("ALL", qos, quota, monitor_window)
-        self.user_rolling_window = user_rolling_window
+        super().__init__("ALL", qos, quota, monitor_window, start_date, account) if not account else super().__init__(None, qos, quota, monitor_window, start_date, account)
+
+        self.user_rolling_window = None
+        if not self.start_date:
+            self.user_rolling_window = user_rolling_window
         # self.report_usage()
 
     def usage_monitor(self):
@@ -180,7 +194,7 @@ class ResourceCheckerAdmin(ResourceChecker):
             return
 
         for user in list(active_users):
-            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
+            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window, self.start_date, self.account)
             user_quota, _ = user_checker.usage_report(verbose=False)
             print(f"User: {user} | Remaining Quota: {user_quota:.2f} GPUhrs")
 
@@ -214,7 +228,7 @@ class ResourceCheckerAdmin(ResourceChecker):
         usage_ls = []
 
         for user in list(users):
-            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
+            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window, self.start_date, self.account)
             user_quota, _ = user_checker.usage_report(verbose=False)
 
             used_quota = self.quota - user_quota
