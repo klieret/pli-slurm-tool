@@ -48,10 +48,9 @@ def pli_lc_monitor_admin(monitor_window: int, file_path:str):
             try:
                 with open(file_path, 'r') as f:
                     data = json.load(f)
-                print("Data read successfully from JSON file.")
                 return data
             except (IOError, json.JSONDecodeError) as e:
-                print(f"Failed to read JSON file: {e}")
+                print(f"Failed to read JSON file at {file_path}: {e}")
                 raise
     
     if not os.path.exists(file_path):

@@ -46,7 +46,7 @@ class ResourceChecker:
             command = f"sacct --allusers -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         else:
             if self.account:
-                command = f"sacct -A {self.account} -S {self.start_time} -E {self.end_time} --qos={qos} --json"
+                command = f"sacct -A {self.account} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
             else:
                 command = f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         try:
@@ -196,7 +196,9 @@ class ResourceCheckerAdmin(ResourceChecker):
         for user in list(active_users):
             user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window, self.start_date, self.account)
             user_quota, _ = user_checker.usage_report(verbose=False)
-            print(f"User: {user} | Remaining Quota: {user_quota:.2f} GPUhrs")
+            print(
+                f"User: {user} | Remaining Quota: {user_quota:.2f} GPUhrs" if not self.account else f"User: {user} part of Account: {self.account} | Remaining Quota: {user_quota:.2f} GPUhrs"
+            )
 
             if user_quota < 0:
                 # If the user has exceeded the quota but still within the grace period
@@ -237,7 +239,7 @@ class ResourceCheckerAdmin(ResourceChecker):
 
         usage_ls.sort(key=lambda x: x[1], reverse=True)
         # print("== PLI High Priority GPU Usage Report ==\n")
-        print(f"\n {'User':10} | Quota Used (cap@{self.quota:.2f})")
+        print(f"\n {'User':10} | Quota Used (cap@{self.quota:.2f})") if not self.account else print(f"\n {'User':10} part of Account: {self.account}| Quota Used (cap@{self.quota:.2f})")
         print("======================================")
         for user, quota in usage_ls:
             message = "!Exceeded!" if quota < 0 else ""
