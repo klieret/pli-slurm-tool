@@ -46,7 +46,7 @@ class ResourceChecker:
             command = f"sacct --allusers -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         else:
             if self.account:
-                command = f"sacct -A {self.account} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
+                command = f"sacct --allusers -A {self.account} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
             else:
                 command = f"sacct -u {self.user} -S {self.start_time} -E {self.end_time} --qos={self.qos} --json"
         try:
@@ -205,13 +205,13 @@ class ResourceCheckerAdmin(ResourceChecker):
                 if user_checker.get_quota_yesterday() >= 0:
                     # send warning email
                     _, user_report = user_checker.usage_report()
-                    email_hpgres_cap_warning(user, user_report, user_checker.active_jobs, self.yag)
+                    email_hpgres_cap_warning(user, user_report, user_checker.active_jobs, self.yag, self.account)
 
                 # If the user has exceeded the quota and the grace period (1 day) is over
                 else:
                     # send canceling email and cancel jobs
                     _, user_report = user_checker.usage_report()
-                    email_hpgres_cap_canceling(user, user_report, user_checker.active_jobs, self.yag)
+                    email_hpgres_cap_canceling(user, user_report, user_checker.active_jobs, self.yag, self.account)
                     for job in user_checker.active_jobs:
                         cancel_job(job["job_id"])
 
