@@ -3,14 +3,14 @@ ci:
 
 repos:
   - repo: https://github.com/crate-ci/typos
-    rev: dictgen-v0.3.1
+    rev: typos-dict-v0.12.4
     hooks:
       - id: typos
         files: \.(py|md|rst|yaml|toml)
         exclude: pyproject.toml
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.2
+    rev: v0.9.6
     hooks:
       # Run the linter.
       - id: ruff
