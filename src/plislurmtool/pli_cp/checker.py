@@ -21,7 +21,7 @@ class ResourceChecker:
         try:
             self.yag = yagmail.SMTP(os.getenv("EmailUsername"), os.getenv("Password"))
         except Exception:
-            pass
+            self.yag = None
 
         # If rolling reset days is set, start time is set to that many days ago
         # Otherwise, start time is set to the first day of the current month
@@ -88,7 +88,7 @@ class ResourceChecker:
                 job_ls.append(job)
         return job_ls
 
-    def get_gpu_hrs(self, start_timestamp: int, end_timestamp: int) -> float:
+    def get_gpu_hrs(self, start_timestamp: int | float, end_timestamp: int | float) -> float:
         return (
             sum(
                 [
