@@ -214,9 +214,12 @@ class ResourceCheckerAdmin(ResourceChecker):
         usage_ls = []
 
         for user in list(users):
-            user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
-            user_quota, _ = user_checker.usage_report(verbose=False)
-
+            try:
+                user_checker = ResourceChecker(user, self.qos, self.quota, self.user_rolling_window)
+                user_quota, _ = user_checker.usage_report(verbose=False)
+            except Exception as e:
+                print(f"Error while checking user {user}: {e}")
+                continue
             used_quota = self.quota - user_quota
             if used_quota > 1e-5:
                 usage_ls.append((user, used_quota))
