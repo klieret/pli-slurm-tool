@@ -32,9 +32,11 @@ def get_slurm_data(output_dir: Path):
         ("pli-c", "sacct_pli_core.json"),
         ("pli-lc", "sacct_pli_large_campus.json"),
         ("pli", "sacct_pli_campus.json"),
+        ("pli-p", "sacct_pli_p.json"),
     ]
 
     for partition, filename in partitions:
+        print("Fetching data for", partition)
         result = subprocess.run(
             ["sacct", "-S", start_date, "--partition", partition, "--allusers", "--json"],
             capture_output=True,
@@ -47,10 +49,11 @@ def get_slurm_data(output_dir: Path):
 def load_data(data_dir: Path) -> pd.DataFrame:
     """Load and parse SLURM data from JSON files."""
     analyzer = SLURMAnalyzer()
-    files = ["sacct_pli_core.json", "sacct_pli_campus.json", "sacct_pli_large_campus.json"]
+    files = ["sacct_pli_core.json", "sacct_pli_campus.json", "sacct_pli_large_campus.json", "sacct_pli_p.json"]
 
     dfs = []
     for filename in files:
+        print("Loading data from", filename)
         filepath = data_dir / filename
         if filepath.exists():
             dfs.append(analyzer.parse(json.loads(filepath.read_text())))
@@ -61,39 +64,41 @@ def load_data(data_dir: Path) -> pd.DataFrame:
 def wait_by_partition(df: pd.DataFrame, title: str = ""):
     """Generate a table showing wait times by partition with month-over-month comparison."""
     tab = []
-    for partition in ["pli-c", "pli-lc", "pli"]:
+    for partition in ["pli-c", "pli-lc", "pli", "pli-p"]:
         # Last 30 days
         current = df.query(f"partition == '{partition}' and age_days <= 30")
-        current_avg = current.wait_time_h.mean() if len(current) > 0 else 0
-        current_long = len(current.query("wait_time_h > 24"))
+        current_median = current.wait_time_h.median() if len(current) > 0 else 0
+        current_long_count = len(current.query("wait_time_h > 6"))
         current_total = len(current)
+        current_long_pct = (current_long_count / current_total * 100) if current_total > 0 else 0
 
         # Previous 30 days (31-60 days ago)
         previous = df.query(f"partition == '{partition}' and age_days > 30 and age_days <= 60")
-        previous_avg = previous.wait_time_h.mean() if len(previous) > 0 else 0
-        previous_long = len(previous.query("wait_time_h > 24"))
+        previous_median = previous.wait_time_h.median() if len(previous) > 0 else 0
+        previous_long_count = len(previous.query("wait_time_h > 6"))
         previous_total = len(previous)
+        previous_long_pct = (previous_long_count / previous_total * 100) if previous_total > 0 else 0
 
         # Format with percentage changes
         tab.append(
             (
                 partition,
-                f"{current_avg:.1f}{format_pct_change(current_avg, previous_avg)}",
-                f"{current_long}{format_pct_change(current_long, previous_long)}",
-                f"{current_total}{format_pct_change(current_total, previous_total)}",
+                f"{current_median:.2f}{format_pct_change(current_median, previous_median)}",
+                f"{current_long_pct:.1f}%{format_pct_change(current_long_pct, previous_long_pct)}",
+                f"{current_total:,}{format_pct_change(current_total, previous_total)}",
             )
         )
 
     if title:
         print(title)
-    print(tabulate.tabulate(tab, headers=["Partition", "Avg. wait (h)", "jobs with wait > 24h", "Jobs"]))
+    print(tabulate.tabulate(tab, headers=["Partition", "Median wait (h)", "jobs with wait > 6h (%)", "Jobs"]))
 
 
 def utilization_by_partition(df: pd.DataFrame):
     """Print total GPU utilization by partition with month-over-month comparison."""
     print("Total GPU Utilization by Partition (Last 30 Days)")
     tab = []
-    for partition in ["pli-c", "pli-lc", "pli"]:
+    for partition in ["pli-c", "pli-lc", "pli", "pli-p"]:
         # Last 30 days
         current = df.query(f"partition == '{partition}' and age_days <= 30")
         current_util = current["gpu_time_h"].sum()
@@ -107,8 +112,8 @@ def utilization_by_partition(df: pd.DataFrame):
         tab.append(
             (
                 partition,
-                f"{current_util / 1000:.0f}k{format_pct_change(current_util, previous_util)}",
-                f"{current_jobs}{format_pct_change(current_jobs, previous_jobs)}",
+                f"{current_util / 1000:,.0f}k{format_pct_change(current_util, previous_util)}",
+                f"{current_jobs:,}{format_pct_change(current_jobs, previous_jobs)}",
             )
         )
 
@@ -118,10 +123,15 @@ def utilization_by_partition(df: pd.DataFrame):
 
 def generate_report(df: pd.DataFrame):
     """Generate the complete monthly report with all tables."""
+    print("\n" + "=" * 70)
+    print(" " * 20 + "SLURM MONTHLY REPORT")
+    print("=" * 70 + "\n")
+
     utilization_by_partition(df)
-    wait_by_partition(df.query("gpu_time_h <= 23"), "Wait Times by Partition (Small Jobs, ≤23 GPU hours)")
+    wait_by_partition(df.query("gpu_time_h <= 50"), "Wait Times by Partition (Small Jobs, ≤50 GPU hours)")
     print()
-    wait_by_partition(df.query("gpu_time_h > 23"), "Wait Times by Partition (Large Jobs, >23 GPU hours)")
+    wait_by_partition(df.query("gpu_time_h > 50"), "Wait Times by Partition (Large Jobs, >50 GPU hours)")
+    print("\n" + "=" * 70)
 
 
 def main():
