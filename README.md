@@ -8,7 +8,7 @@ Install the pipx package in your environment: e.g. `pip install pipx`.
 
 ```bash
 # User-level quota checking for PLI-CP QoS
-pipx run pli-slurm-tool cp-quota-check`
+pipx run pli-slurm-tool cp-quota-check
 ```
 
 ## Admin usage
