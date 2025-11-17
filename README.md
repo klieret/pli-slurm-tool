@@ -33,7 +33,12 @@ pip install --editable .
 
 In order to release a new version
 
-1. Bump version (you cannot overwrite pypi versions)
+1. Increment version in `src/plislurmtool/__init__.py` and push it as a commit
+2. Use the github UI to create a new release (use tag `v<VERSION>`, e.g., `v1.0.0`)
+
+Alternatively, here are the manual steps
+
+1. Increment version as above
 2. Add tag `git tag v1.0.0`
 3. Push `git push && git push origin v1.0.0`
 4. `rm -r dist/** && python -m build`
