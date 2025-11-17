@@ -1,7 +1,9 @@
 import argparse
 import os
+from pathlib import Path
 
 from .pli_cp import ResourceChecker, ResourceCheckerAdmin
+from .reports import monthly_report
 
 
 def pli_pc_check_quota(quota: int, rolling_window: int):
@@ -76,6 +78,18 @@ def main():
     subparsers.add_parser("cp-monitor-admin", help="Admin monitoring for PLI-CP QOS", parents=[parent_parser])
     subparsers.add_parser("cp-quota-report-admin", help="Admin quota for PLI-CP QOS", parents=[parent_parser])
 
+    # Monthly report subcommand
+    monthly_parser = subparsers.add_parser("monthly-report", help="Generate monthly SLURM usage report")
+    monthly_parser.add_argument(
+        "--use-cached-data", action="store_true", help="Use cached JSON files instead of fetching fresh data"
+    )
+    monthly_parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="Directory for storing/reading JSON data files (default: current directory)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "cp-quota-check":
@@ -84,6 +98,15 @@ def main():
         pli_pc_monitor_admin(args.quota, args.monitor_window, args.rolling_window)
     elif args.command == "cp-quota-report-admin":
         pli_pc_monitor_admin_report(args.quota, args.monitor_window, args.rolling_window)
+    elif args.command == "monthly-report":
+        # Pass through to monthly report module
+        import sys
+
+        sys.argv = ["monthly-report"]
+        if args.use_cached_data:
+            sys.argv.append("--use-cached-data")
+        sys.argv.extend(["--data-dir", str(args.data_dir)])
+        exit(monthly_report.main())
     else:
         print("No command provided. Use -h for help.")
 
