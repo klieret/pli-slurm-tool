@@ -2,6 +2,8 @@
 
 Script to monitor PLI partitions of the Princeton clusters
 
+Pypi: https://pypi.org/project/pli-slurm-tool/
+
 ## Usage
 
 Install the pipx package in your environment: e.g. `pip install pipx`.
