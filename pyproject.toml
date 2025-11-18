@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pli-slurm-tool"
 dynamic = ["version",]
-description = ""
+description = "Princeton University Language & Intelligence Initiative SLURM management tool"
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
