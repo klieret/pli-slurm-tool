@@ -24,6 +24,33 @@ def format_pct_change(current, previous):
     return ""
 
 
+def format_time_h_min(hours):
+    """Format time in hours to human-readable format (e.g., '1h15', '3h10', '15min', '< 1min')."""
+    if pd.isna(hours) or hours == 0:
+        return "< 1min"
+
+    total_minutes = hours * 60
+
+    if total_minutes < 1:
+        return "< 1min"
+
+    h = int(hours)
+    minutes = int(round((hours - h) * 60))
+
+    # Handle rounding edge case where minutes round to 60
+    if minutes == 60:
+        h += 1
+        minutes = 0
+
+    if h > 0:
+        if minutes > 0:
+            return f"{h}h{minutes:02d}"
+        else:
+            return f"{h}h"
+    else:
+        return f"{minutes}min"
+
+
 def get_slurm_data(output_dir: Path):
     """Fetch SLURM accounting data for the last 60 days."""
     start_date = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
@@ -83,7 +110,7 @@ def wait_by_partition(df: pd.DataFrame, title: str = ""):
         tab.append(
             (
                 partition,
-                f"{current_median:.2f}{format_pct_change(current_median, previous_median)}",
+                f"{format_time_h_min(current_median)}{format_pct_change(current_median, previous_median)}",
                 f"{current_long_pct:.1f}%{format_pct_change(current_long_pct, previous_long_pct)}",
                 f"{current_total:,}{format_pct_change(current_total, previous_total)}",
             )
@@ -91,7 +118,7 @@ def wait_by_partition(df: pd.DataFrame, title: str = ""):
 
     if title:
         print(title)
-    print(tabulate.tabulate(tab, headers=["Partition", "Median wait (h)", "jobs with wait > 6h (%)", "Jobs"]))
+    print(tabulate.tabulate(tab, headers=["Partition", "Median wait", "jobs with wait > 6h (%)", "Jobs"]))
 
 
 def utilization_by_partition(df: pd.DataFrame):
