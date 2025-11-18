@@ -14,8 +14,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
       - name: Build sdist and wheel
         run: pipx run build
+
+      - name: List built files
+        run: ls -lh dist/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -25,6 +33,7 @@ jobs:
         run: pipx run twine check dist/*
 
       - uses: pypa/gh-action-pypi-publish@v1.6.1
+        if: github.event_name == 'release' && github.event.action == 'published'
         with:
           # Remember to generate this and set it in "GitHub Secrets"
           password: ${{ secrets.pypi_password }}
