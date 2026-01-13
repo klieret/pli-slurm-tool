@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from .pli_cp import ResourceChecker, ResourceCheckerAdmin
-from .reports import monthly_report
+from .reports import monthly_report, wandb_dashboard
 
 
 def pli_pc_check_quota(quota: int, rolling_window: int):
@@ -90,6 +90,17 @@ def main():
         help="Directory for storing/reading JSON data files (default: current directory)",
     )
 
+    # WandB dashboard subcommand
+    wandb_parser = subparsers.add_parser(
+        "wandb-dashboard", help="Log SLURM metrics to WandB dashboard (requires wandb optional dependency)"
+    )
+    wandb_parser.add_argument(
+        "--rewrite-history-up-to-days",
+        type=int,
+        metavar="N",
+        help="Clear WandB history and rebuild from N days of historical data",
+    )
+
     args = parser.parse_args()
 
     if args.command == "cp-quota-check":
@@ -107,6 +118,11 @@ def main():
             sys.argv.append("--use-cached-data")
         sys.argv.extend(["--data-dir", str(args.data_dir)])
         exit(monthly_report.main())
+    elif args.command == "wandb-dashboard":
+        if args.rewrite_history_up_to_days:
+            wandb_dashboard.rewrite_history(args.rewrite_history_up_to_days)
+        else:
+            wandb_dashboard.log_daily()
     else:
         print("No command provided. Use -h for help.")
 
