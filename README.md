@@ -69,6 +69,12 @@ Rewrite history for the last N days (clears existing data and rebuilds):
 pli-slurm-tool wandb-dashboard --rewrite-history-up-to-days 30
 ```
 
+Use existing JSON files instead of fetching via sacct:
+
+```bash
+pli-slurm-tool wandb-dashboard --rewrite-history-up-to-days 60 --data-dir /path/to/json/files
+```
+
 ### Metrics Tracked
 
 For each partition (pli-c, pli-lc, pli, pli-p):

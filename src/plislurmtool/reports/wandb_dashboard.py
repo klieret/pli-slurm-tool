@@ -10,8 +10,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
-import wandb
 from dotenv import load_dotenv
+
+import wandb
 
 from .slurm_analyzer import SLURMAnalyzer
 
@@ -117,84 +118,70 @@ def compute_daily_metrics(df: pd.DataFrame, target_date: datetime) -> dict:
     return metrics
 
 
-def log_to_wandb(metrics: dict, timestamp: datetime, config: dict):
-    """Log metrics to WandB with a specific timestamp."""
-    run = wandb.init(
-        **config,
-        name="daily-metrics",
-        resume="allow",
-        id="daily-metrics-run",
-    )
-
-    epoch_ms = int(timestamp.timestamp() * 1000)
-    wandb.log(metrics, step=epoch_ms)
-
-    run.finish()
-
-
-def delete_wandb_runs(config: dict):
-    """Delete all runs in the WandB project to clear history."""
-    api = wandb.Api()
-
-    project_path = f"{config['entity']}/{config['project']}" if config.get("entity") else config["project"]
-
-    try:
-        runs = api.runs(project_path)
-        for run in runs:
-            print(f"Deleting run: {run.name} ({run.id})")
-            run.delete()
-    except wandb.errors.CommError:
-        print(f"Project {project_path} not found or no runs to delete.")
-
-
-def rewrite_history(days: int):
+def rewrite_history(days: int, data_dir: Path | None = None):
     """Clear WandB history and rebuild from N days of historical data."""
     config = get_wandb_config()
 
     print(f"Rewriting history for the last {days} days...")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        data_dir = Path(tmpdir)
-        get_slurm_data(data_dir, days=days)
+    if data_dir:
         df = load_data(data_dir)
-
-    print("Clearing existing WandB runs...")
-    delete_wandb_runs(config)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            get_slurm_data(tmp_path, days=days)
+            df = load_data(tmp_path)
 
     run = wandb.init(
         **config,
         name="daily-metrics",
-        id="daily-metrics-run",
+        id="slurm-daily-metrics",
+        resume="allow",
     )
 
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    for day_offset in range(days - 1, -1, -1):
+    for step, day_offset in enumerate(range(days - 1, -1, -1)):
         target_date = today - timedelta(days=day_offset)
         print(f"Computing metrics for {target_date.strftime('%Y-%m-%d')}...")
 
         metrics = compute_daily_metrics(df, target_date)
-        epoch_ms = int(target_date.timestamp() * 1000)
-        wandb.log(metrics, step=epoch_ms)
+        metrics["_timestamp"] = target_date.timestamp()
+        wandb.log(metrics, step=step)
 
     run.finish()
     print(f"Successfully logged {days} days of historical data to WandB.")
 
 
-def log_daily():
+def log_daily(data_dir: Path | None = None):
     """Log yesterday's metrics to WandB."""
     config = get_wandb_config()
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        data_dir = Path(tmpdir)
-        get_slurm_data(data_dir, days=2)
+    if data_dir:
         df = load_data(data_dir)
+    else:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            get_slurm_data(tmp_path, days=2)
+            df = load_data(tmp_path)
 
     yesterday = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
     print(f"Computing metrics for {yesterday.strftime('%Y-%m-%d')}...")
 
     metrics = compute_daily_metrics(df, yesterday)
-    log_to_wandb(metrics, yesterday, config)
+
+    run = wandb.init(
+        **config,
+        name="daily-metrics",
+        resume="allow",
+        id="slurm-daily-metrics",
+    )
+
+    next_step = run.step + 1 if run.step else 0
+    metrics["_timestamp"] = yesterday.timestamp()
+    wandb.log(metrics, step=next_step)
+
+    run.finish()
 
     print(f"Successfully logged metrics for {yesterday.strftime('%Y-%m-%d')} to WandB.")
 
@@ -208,12 +195,17 @@ def main():
         metavar="N",
         help="Clear WandB history and rebuild from N days of historical data",
     )
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        help="Use existing JSON files from this directory instead of fetching via sacct",
+    )
     args = parser.parse_args()
 
     if args.rewrite_history_up_to_days:
-        rewrite_history(args.rewrite_history_up_to_days)
+        rewrite_history(args.rewrite_history_up_to_days, args.data_dir)
     else:
-        log_daily()
+        log_daily(args.data_dir)
 
 
 if __name__ == "__main__":

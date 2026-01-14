@@ -100,6 +100,11 @@ def main():
         metavar="N",
         help="Clear WandB history and rebuild from N days of historical data",
     )
+    wandb_parser.add_argument(
+        "--data-dir",
+        type=Path,
+        help="Use existing JSON files from this directory instead of fetching via sacct",
+    )
 
     args = parser.parse_args()
 
@@ -120,9 +125,9 @@ def main():
         exit(monthly_report.main())
     elif args.command == "wandb-dashboard":
         if args.rewrite_history_up_to_days:
-            wandb_dashboard.rewrite_history(args.rewrite_history_up_to_days)
+            wandb_dashboard.rewrite_history(args.rewrite_history_up_to_days, args.data_dir)
         else:
-            wandb_dashboard.log_daily()
+            wandb_dashboard.log_daily(args.data_dir)
     else:
         print("No command provided. Use -h for help.")
 
